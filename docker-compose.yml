@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-skypulse}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d skypulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow:
+    image: apache/airflow:2.10.4-python3.12
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/skypulse
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: skypulse-local-secret
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/skypulse/airflow/dags
+      WAREHOUSE_BACKEND: postgres
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/skypulse
+      DBT_PG_HOST: postgres
+      DBT_PG_PORT: "5432"
+      DBT_PG_USER: postgres
+      DBT_PG_PASSWORD: postgres
+      DBT_PG_DBNAME: skypulse
+      DBT_PG_SSLMODE: disable
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/opt/skypulse
+    command: >
+      bash -c "pip install --no-cache-dir -r /opt/skypulse/requirements.txt && airflow standalone"
+
+  skypulse-api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: docker
+      WAREHOUSE_BACKEND: postgres
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/skypulse
+      AUTO_BOOTSTRAP_ON_STARTUP: "true"
+    ports:
+      - "8000:8000"
+
+volumes:
+  pg_data:

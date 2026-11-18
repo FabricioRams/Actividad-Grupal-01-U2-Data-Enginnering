@@ -1,0 +1,36 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Data & Local Warehouse
+data/*.duckdb
+data/*.duckdb.wal
+data/*.db
+logs/
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+
+# Airflow
+airflow/logs/
+airflow/plugins/
+airflow/*.db
+airflow/*.cfg
+airflow/*.pid
+
+# OS
+.DS_Store
+Thumbs.db

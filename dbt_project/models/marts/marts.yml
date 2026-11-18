@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: dim_cities
+    description: "City dimension table."
+    columns:
+      - name: city_id
+        tests:
+          - not_null
+          - unique
+
+  - name: fct_city_hourly_metrics
+    description: "Hourly weather + air quality fact table with comfort index."
+    columns:
+      - name: observation_pk
+        tests:
+          - not_null
+          - unique
+      - name: city_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_cities')
+              field: city_id
+
+  - name: mart_city_daily_summary
+    description: "Daily aggregated weather and AQI KPIs per city."
+    columns:
+      - name: city_id
+        tests:
+          - not_null
+      - name: observed_date_utc
+        tests:
+          - not_null
+
+  - name: mart_climate_anomalies
+    description: "Detected thermal, wind, precipitation, and air-quality anomalies."
+    columns:
+      - name: observation_pk
+        tests:
+          - not_null
+          - unique
+      - name: anomaly_type
+        tests:
+          - accepted_values:
+              values: ["Air Quality Alert", "Thermal Anomaly", "High Wind Advisory", "Heavy Precipitation"]

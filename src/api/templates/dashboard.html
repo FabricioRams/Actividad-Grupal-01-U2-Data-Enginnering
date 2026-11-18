@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkyPulse | Cloud-Native Weather & Air Quality ELT Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+  <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur sticky top-0 z-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex h-3 w-3 rounded-full bg-emerald-400 animate-pulse"></span>
+          <h1 class="text-xl font-bold tracking-tight text-white">SkyPulse Data Platform</h1>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
+            Zero-AWS ELT
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">
+          Open-Meteo API &rarr; Python Ingestion &rarr; dbt Core Medallion Marts &rarr; Apache Airflow / GitHub Actions
+        </p>
+      </div>
+      <div class="flex items-center gap-3 text-xs">
+        <span id="backend-badge" class="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-300">
+          Backend: loading...
+        </span>
+        <a href="/docs" class="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition">
+          OpenAPI Docs
+        </a>
+        <a href="/health" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+          Health
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- KPI Row -->
+    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-400">Monitored Cities</p>
+        <p id="kpi-cities" class="text-2xl font-bold text-white mt-1">--</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-400">Hourly Records</p>
+        <p id="kpi-obs" class="text-2xl font-bold text-sky-400 mt-1">--</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-400">Global Avg Temp</p>
+        <p id="kpi-temp" class="text-2xl font-bold text-amber-400 mt-1">--</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-400">Global Avg US AQI</p>
+        <p id="kpi-aqi" class="text-2xl font-bold text-emerald-400 mt-1">--</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-400">Avg Comfort Score</p>
+        <p id="kpi-comfort" class="text-2xl font-bold text-indigo-400 mt-1">--</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-400">Detected Anomalies</p>
+        <p id="kpi-anomalies" class="text-2xl font-bold text-rose-400 mt-1">--</p>
+      </div>
+    </section>
+
+    <!-- Charts Row -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 rounded-xl bg-slate-900 border border-slate-800 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-sm font-semibold text-white">Hourly Temperature &amp; Air Quality Trajectory</h2>
+            <p class="text-xs text-slate-400">Powered by dbt mart <code class="text-sky-300">marts.fct_city_hourly_metrics</code></p>
+          </div>
+          <select id="city-select" class="bg-slate-800 border border-slate-700 text-slate-100 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </select>
+        </div>
+        <div id="timeseries-chart" class="w-full h-80"></div>
+      </div>
+
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-5">
+        <div class="mb-3">
+          <h2 class="text-sm font-semibold text-white">City Comfort Index Ranking</h2>
+          <p class="text-xs text-slate-400">Composite score (0&ndash;100) from temp, humidity, AQI &amp; wind</p>
+        </div>
+        <div id="ranking-chart" class="w-full h-80"></div>
+      </div>
+    </section>
+
+    <!-- Anomalies + Pipeline Runs -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-5 overflow-hidden">
+        <h2 class="text-sm font-semibold text-white">Climate &amp; Air Quality Anomalies</h2>
+        <p class="text-xs text-slate-400 mb-3">Source: <code class="text-rose-300">marts.mart_climate_anomalies</code></p>
+        <div class="overflow-x-auto max-h-72">
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-2 pr-3">City</th>
+                <th class="py-2 pr-3">Type</th>
+                <th class="py-2 pr-3">Temp (&deg;C)</th>
+                <th class="py-2 pr-3">US AQI</th>
+                <th class="py-2">Observed (UTC)</th>
+              </tr>
+            </thead>
+            <tbody id="anomalies-tbody" class="divide-y divide-slate-800/70"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-5 overflow-hidden">
+        <h2 class="text-sm font-semibold text-white">ELT Pipeline Run Telemetry</h2>
+        <p class="text-xs text-slate-400 mb-3">Source: <code class="text-emerald-300">raw.raw_pipeline_runs</code></p>
+        <div class="overflow-x-auto max-h-72">
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-2 pr-3">Run ID</th>
+                <th class="py-2 pr-3">Status</th>
+                <th class="py-2 pr-3">dbt</th>
+                <th class="py-2 pr-3">Rows (W/AQ)</th>
+                <th class="py-2">Started (UTC)</th>
+              </tr>
+            </thead>
+            <tbody id="runs-tbody" class="divide-y divide-slate-800/70"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const plotlyDarkLayout = {
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(15,23,42,0.5)",
+      font: { color: "#cbd5e1", size: 11 },
+      margin: { l: 45, r: 45, t: 16, b: 40 },
+      xaxis: { gridcolor: "#1e293b" },
+      yaxis: { gridcolor: "#1e293b" }
+    };
+
+    async function loadCitySeries(cityId) {
+      const res = await fetch(`/api/v1/hourly?city_id=${encodeURIComponent(cityId)}&limit=120`);
+      const data = await res.json();
+      const rows = data.records || [];
+      const x = rows.map(r => r.observed_at_utc);
+      const temps = rows.map(r => r.temperature_c);
+      const aqi = rows.map(r => r.us_aqi);
+
+      Plotly.newPlot("timeseries-chart", [
+        {
+          x, y: temps, name: "Temp (°C)", type: "scatter", mode: "lines",
+          line: { color: "#f59e0b", width: 2.5 }
+        },
+        {
+          x, y: aqi, name: "US AQI", type: "scatter", mode: "lines",
+          yaxis: "y2", line: { color: "#38bdf8", width: 2, dash: "dot" }
+        }
+      ], {
+        ...plotlyDarkLayout,
+        yaxis: { title: "Temp (°C)", gridcolor: "#1e293b" },
+        yaxis2: { title: "US AQI", overlaying: "y", side: "right", gridcolor: "transparent" },
+        legend: { orientation: "h", y: 1.12 }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    async function bootstrapDashboard() {
+      const [healthRes, summaryRes, citiesRes, anomaliesRes, runsRes] = await Promise.all([
+        fetch("/health"),
+        fetch("/api/v1/summary"),
+        fetch("/api/v1/cities"),
+        fetch("/api/v1/anomalies?limit=25"),
+        fetch("/api/v1/pipeline/runs?limit=10")
+      ]);
+
+      const health = await healthRes.json();
+      const summary = await summaryRes.json();
+      const citiesData = await citiesRes.json();
+      const anomaliesData = await anomaliesRes.json();
+      const runsData = await runsRes.json();
+
+      document.getElementById("backend-badge").textContent = `Backend: ${health.backend} (${health.environment})`;
+      document.getElementById("kpi-cities").textContent = summary.cities_count ?? 0;
+      document.getElementById("kpi-obs").textContent = (summary.hourly_observations ?? 0).toLocaleString();
+      document.getElementById("kpi-temp").textContent = summary.avg_temperature_c != null ? `${summary.avg_temperature_c} °C` : "--";
+      document.getElementById("kpi-aqi").textContent = summary.avg_us_aqi != null ? summary.avg_us_aqi : "--";
+      document.getElementById("kpi-comfort").textContent = summary.avg_comfort_index != null ? `${summary.avg_comfort_index}/100` : "--";
+      document.getElementById("kpi-anomalies").textContent = summary.anomalies_count ?? 0;
+
+      const cities = citiesData.cities || [];
+      const select = document.getElementById("city-select");
+      select.innerHTML = cities.map(c => `<option value="${c.city_id}">${c.city_name}, ${c.country}</option>`).join("");
+      select.addEventListener("change", (e) => loadCitySeries(e.target.value));
+
+      if (cities.length > 0) {
+        await loadCitySeries(cities[0].city_id);
+        Plotly.newPlot("ranking-chart", [{
+          type: "bar",
+          orientation: "h",
+          y: cities.map(c => c.city_name).reverse(),
+          x: cities.map(c => c.avg_comfort_index).reverse(),
+          marker: { color: "#6366f1" }
+        }], {
+          ...plotlyDarkLayout,
+          margin: { l: 95, r: 16, t: 10, b: 36 },
+          xaxis: { title: "Comfort Score", range: [0, 100], gridcolor: "#1e293b" }
+        }, { responsive: true, displayModeBar: false });
+      }
+
+      const anomaliesBody = document.getElementById("anomalies-tbody");
+      anomaliesBody.innerHTML = (anomaliesData.anomalies || []).map(a => `
+        <tr>
+          <td class="py-2 pr-3 font-medium text-white">${a.city_name}</td>
+          <td class="py-2 pr-3"><span class="px-2 py-0.5 rounded bg-rose-500/15 text-rose-300">${a.anomaly_type}</span></td>
+          <td class="py-2 pr-3">${a.temperature_c ?? "--"}</td>
+          <td class="py-2 pr-3">${a.us_aqi ?? "--"}</td>
+          <td class="py-2 text-slate-400">${(a.observed_at_utc || "").slice(0, 16).replace("T", " ")}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" class="py-4 text-slate-500 text-center">No anomalies detected in current window.</td></tr>`;
+
+      const runsBody = document.getElementById("runs-tbody");
+      runsBody.innerHTML = (runsData.runs || []).map(r => `
+        <tr>
+          <td class="py-2 pr-3 font-mono text-sky-300">${r.run_id.slice(0, 22)}</td>
+          <td class="py-2 pr-3"><span class="px-2 py-0.5 rounded ${r.status === 'success' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}">${r.status}</span></td>
+          <td class="py-2 pr-3">${r.dbt_status ?? "--"}</td>
+          <td class="py-2 pr-3">${r.weather_rows}/${r.air_quality_rows}</td>
+          <td class="py-2 text-slate-400">${(r.started_at_utc || "").slice(0, 16).replace("T", " ")}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" class="py-4 text-slate-500 text-center">No pipeline runs recorded yet.</td></tr>`;
+    }
+
+    bootstrapDashboard().catch(console.error);
+  </script>
+</body>
+</html>

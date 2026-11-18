@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: "Raw telemetry ingested from Open-Meteo Weather and Air Quality APIs."
+    tables:
+      - name: raw_weather_hourly
+        description: "Hourly weather measurements per monitored city."
+      - name: raw_air_quality_hourly
+        description: "Hourly air quality pollutants and US AQI per monitored city."
+      - name: raw_pipeline_runs
+        description: "Operational metadata for ELT pipeline runs."

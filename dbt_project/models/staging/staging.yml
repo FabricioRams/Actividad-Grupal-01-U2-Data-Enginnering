@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: stg_weather_hourly
+    description: "Deduplicated and typed hourly weather observations."
+    columns:
+      - name: weather_pk
+        tests:
+          - not_null
+          - unique
+      - name: city_id
+        tests:
+          - not_null
+      - name: observed_at_utc
+        tests:
+          - not_null
+
+  - name: stg_air_quality_hourly
+    description: "Deduplicated hourly air quality observations with EPA AQI categorization."
+    columns:
+      - name: air_quality_pk
+        tests:
+          - not_null
+          - unique
+      - name: aqi_category
+        tests:
+          - accepted_values:
+              values: ["Unknown", "Good", "Moderate", "Sensitive", "Unhealthy", "Hazardous"]

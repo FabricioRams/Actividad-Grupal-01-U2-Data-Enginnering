@@ -1,0 +1,19 @@
+skypulse:
+  target: duckdb
+  outputs:
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../data/skypulse.duckdb') }}"
+      schema: analytics
+      threads: 4
+
+    postgres:
+      type: postgres
+      host: "{{ env_var('DBT_PG_HOST', 'localhost') }}"
+      port: "{{ env_var('DBT_PG_PORT', '5432') | as_number }}"
+      user: "{{ env_var('DBT_PG_USER', 'postgres') }}"
+      password: "{{ env_var('DBT_PG_PASSWORD', 'postgres') }}"
+      dbname: "{{ env_var('DBT_PG_DBNAME', 'skypulse') }}"
+      schema: analytics
+      sslmode: "{{ env_var('DBT_PG_SSLMODE', 'prefer') }}"
+      threads: 4
